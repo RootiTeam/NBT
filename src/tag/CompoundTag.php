@@ -416,7 +416,7 @@ class CompoundTag extends NamedTag implements \ArrayAccess, \Iterator, \Countabl
 	 * @throws \InvalidArgumentException if offset is null
 	 * @throws \TypeError if $value is not a NamedTag object
 	 */
-	public function offsetSet(mixed $offset, NamedTag $value) : void{
+	public function offsetSet(mixed $offset, mixed $value) : void{
 		if($offset === null){
 			throw new \InvalidArgumentException("Array access push syntax is not supported");
 		}
