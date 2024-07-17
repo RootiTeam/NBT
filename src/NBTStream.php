@@ -23,6 +23,7 @@ declare(strict_types=1);
 
 namespace pocketmine\nbt;
 
+use InvalidArgumentException;
 use pocketmine\nbt\tag\ByteTag;
 use pocketmine\nbt\tag\CompoundTag;
 use pocketmine\nbt\tag\FloatTag;
@@ -31,22 +32,21 @@ use pocketmine\nbt\tag\IntTag;
 use pocketmine\nbt\tag\ListTag;
 use pocketmine\nbt\tag\NamedTag;
 use pocketmine\nbt\tag\StringTag;
+use pocketmine\utils\BinaryDataException;
+use UnexpectedValueException;
 use function call_user_func;
+use function chr;
 use function is_array;
 use function is_bool;
 use function is_float;
 use function is_int;
 use function is_numeric;
 use function is_string;
+use function ord;
 use function strlen;
 use function substr;
 use function zlib_decode;
 use function zlib_encode;
-#ifndef COMPILE
-use pocketmine\utils\Binary;
-#endif
-
-#include <rules/NBT.h>
 
 /**
  * Base Named Binary Tag encoder/decoder
@@ -56,12 +56,31 @@ abstract class NBTStream{
 	public $buffer = "";
 	public $offset = 0;
 
+	/**
+	 * @param int|bool $len
+	 *
+	 * @return string
+	 *
+	 * @throws BinaryDataException if there are not enough bytes left in the buffer
+	 */
 	public function get($len) : string{
-		if($len < 0){
-			$this->offset = strlen($this->buffer) - 1;
+		if($len === 0){
 			return "";
-		}elseif($len === true){
-			return substr($this->buffer, $this->offset);
+		}
+
+		$buflen = strlen($this->buffer);
+		if($len === true){
+			$str = substr($this->buffer, $this->offset);
+			$this->offset = $buflen;
+			return $str;
+		}
+		if($len < 0){
+			$this->offset = $buflen - 1;
+			return "";
+		}
+		$remaining = $buflen - $this->offset;
+		if($remaining < $len){
+			throw new BinaryDataException("Not enough bytes left in buffer: need $len, have $remaining");
 		}
 
 		return $len === 1 ? $this->buffer[$this->offset++] : substr($this->buffer, ($this->offset += $len) - $len, $len);
@@ -91,7 +110,7 @@ abstract class NBTStream{
 		$data = $this->readTag(new ReaderTracker($maxDepth));
 
 		if($data === null){
-			throw new \InvalidArgumentException("Found TAG_End at the start of buffer");
+			throw new InvalidArgumentException("Found TAG_End at the start of buffer");
 		}
 
 		if($doMultiple and !$this->feof()){
@@ -129,7 +148,7 @@ abstract class NBTStream{
 		$this->offset = 0;
 		$this->buffer = "";
 
-		if($data instanceof CompoundTag){
+		if($data instanceof NamedTag){
 			$this->writeTag($data);
 
 			return $this->buffer;
@@ -159,7 +178,7 @@ abstract class NBTStream{
 	}
 
 	public function readTag(ReaderTracker $tracker) : ?NamedTag{
-		$tagType = $this->getByte();
+		$tagType = (ord($this->get(1)));
 		if($tagType === NBT::TAG_End){
 			return null;
 		}
@@ -172,25 +191,25 @@ abstract class NBTStream{
 	}
 
 	public function writeTag(NamedTag $tag) : void{
-		$this->putByte($tag->getType());
+		($this->buffer .= chr($tag->getType()));
 		$this->putString($tag->getName());
 		$tag->write($this);
 	}
 
 	public function writeEnd() : void{
-		$this->putByte(NBT::TAG_End);
+		($this->buffer .= chr(NBT::TAG_End));
 	}
 
 	public function getByte() : int{
-		return Binary::readByte($this->get(1));
+		return (ord($this->get(1)));
 	}
 
 	public function getSignedByte() : int{
-		return Binary::readSignedByte($this->get(1));
+		return (ord($this->get(1)) << 56 >> 56);
 	}
 
 	public function putByte(int $v) : void{
-		$this->buffer .= Binary::writeByte($v);
+		$this->buffer .= (chr($v));
 	}
 
 	abstract public function getShort() : int;
@@ -220,7 +239,7 @@ abstract class NBTStream{
 
 	/**
 	 * @return string
-	 * @throws \UnexpectedValueException if a too-large string is found (length may be invalid)
+	 * @throws UnexpectedValueException if a too-large string is found (length may be invalid)
 	 */
 	public function getString() : string{
 		return $this->get(self::checkReadStringLength($this->getShort()));
@@ -228,21 +247,21 @@ abstract class NBTStream{
 
 	/**
 	 * @param string $v
-	 * @throws \InvalidArgumentException if the string is too long
+	 * @throws InvalidArgumentException if the string is too long
 	 */
 	public function putString(string $v) : void{
 		$this->putShort(self::checkWriteStringLength(strlen($v)));
-		$this->put($v);
+		($this->buffer .= $v);
 	}
 
 	/**
 	 * @param int $len
 	 * @return int
-	 * @throws \UnexpectedValueException
+	 * @throws UnexpectedValueException
 	 */
 	protected static function checkReadStringLength(int $len) : int{
 		if($len > 32767){
-			throw new \UnexpectedValueException("NBT string length too large ($len > 32767)");
+			throw new UnexpectedValueException("NBT string length too large ($len > 32767)");
 		}
 		return $len;
 	}
@@ -250,11 +269,11 @@ abstract class NBTStream{
 	/**
 	 * @param int $len
 	 * @return int
-	 * @throws \InvalidArgumentException
+	 * @throws InvalidArgumentException
 	 */
 	protected static function checkWriteStringLength(int $len) : int{
 		if($len > 32767){
-			throw new \InvalidArgumentException("NBT string length too large ($len > 32767)");
+			throw new InvalidArgumentException("NBT string length too large ($len > 32767)");
 		}
 		return $len;
 	}
