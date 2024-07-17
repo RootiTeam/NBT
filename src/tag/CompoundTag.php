@@ -386,7 +386,7 @@ class CompoundTag extends NamedTag implements \ArrayAccess, \Iterator, \Countabl
 	 *
 	 * @return bool
 	 */
-	public function offsetExists($offset){
+	public function offsetExists(mixed $offset) : bool{
 		return isset($this->value[$offset]);
 	}
 
@@ -395,7 +395,7 @@ class CompoundTag extends NamedTag implements \ArrayAccess, \Iterator, \Countabl
 	 *
 	 * @return mixed|null|\ArrayAccess
 	 */
-	public function offsetGet($offset){
+	public function offsetGet(mixed $offset) : mixed{
 		if(isset($this->value[$offset])){
 			if($this->value[$offset] instanceof \ArrayAccess){
 				return $this->value[$offset];
@@ -416,7 +416,7 @@ class CompoundTag extends NamedTag implements \ArrayAccess, \Iterator, \Countabl
 	 * @throws \InvalidArgumentException if offset is null
 	 * @throws \TypeError if $value is not a NamedTag object
 	 */
-	public function offsetSet($offset, $value){
+	public function offsetSet(mixed $offset, NamedTag $value) : void{
 		if($offset === null){
 			throw new \InvalidArgumentException("Array access push syntax is not supported");
 		}
@@ -430,7 +430,7 @@ class CompoundTag extends NamedTag implements \ArrayAccess, \Iterator, \Countabl
 		}
 	}
 
-	public function offsetUnset($offset){
+	public function offsetUnset(mixed $offset) : void{
 		unset($this->value[$offset]);
 	}
 
